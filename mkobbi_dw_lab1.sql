@@ -65,13 +65,16 @@ create table temp1 as select  dense_rank() OVER (ORDER BY order_id) as rang, ord
 select t1.order_id, t1.price from temp1 t1, temp1 t2  where t1.price <= 1.1 * t2.price and t2.Rang = t1.Rang -1;
 drop table temp1;
 -- Question 1.4.5
--- Initialization
-create table temp1 as select  od.order_id as order_id, od.product_id as product_id, od.quantity as quantity, extract (year from o.order_date) as year, p.product_name as product_name from  order_details od, orders o, products p where p.product_id = od.product_id and o.order_id = od.order_id;
--- First Method
-select distinct year, product_name, sum(quantity) over (partition by year, product_id) as qtty 
-from temp1
-order by product_name, year;
--- Second Method
-select distinct year, product_name, sum(quantity) as qtty from temp1 group by product_name, year order by product_name, year;
--- Dropping of temporary table
-drop temp1;
+with temp(year, product_name, price) as
+(	select  extract (year from o.order_date) as year, p.product_name as product_name, sum(od.quantity)  over (partition by extract (year from o.order_date), p.product_id)  as price
+	from order_details od, products p, orders o
+	where od.product_id = p.product_id and o.order_id = od.order_id
+)
+select distinct t1.year, t1.product_name, t1.price
+from temp t1
+inner join ( select year, max(price) as qtty
+				 from temp
+				 group by year) t2
+	 on t1.year = t2.year
+	 and t1.price = t2.qtty
+order by t1.year, t1.price desc;
